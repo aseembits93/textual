@@ -54,11 +54,11 @@ class ContentTab(Tab):
         Returns:
             The ID with the prefix removed.
         """
-        return (
-            content_id[len(cls._PREFIX) :]
-            if content_id.startswith(cls._PREFIX)
-            else content_id
-        )
+        prefix = cls._PREFIX
+        # Use local variable for prefix to avoid repeat attribute lookup
+        if content_id.startswith(prefix):
+            return content_id[len(prefix):]
+        return content_id
 
     def __init__(
         self, label: ContentType, content_id: str, disabled: bool = False
@@ -70,7 +70,9 @@ class ContentTab(Tab):
             content_id: The id of the content associated with the tab.
             disabled: Is the tab disabled?
         """
-        super().__init__(label, id=self.add_prefix(content_id), disabled=disabled)
+        # Use local add_prefix for one less getattr
+        add_prefix = self.add_prefix
+        super().__init__(label, id=add_prefix(content_id), disabled=disabled)
 
 
 class ContentTabs(Tabs):
