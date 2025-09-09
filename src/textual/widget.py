@@ -11,30 +11,13 @@ from contextlib import asynccontextmanager
 from fractions import Fraction
 from time import monotonic
 from types import TracebackType
-from typing import (
-    TYPE_CHECKING,
-    AsyncGenerator,
-    Callable,
-    ClassVar,
-    Collection,
-    Generator,
-    Iterable,
-    Mapping,
-    NamedTuple,
-    Sequence,
-    TypeVar,
-    cast,
-    overload,
-)
+from typing import (TYPE_CHECKING, AsyncGenerator, Callable, ClassVar,
+                    Collection, Generator, Iterable, Mapping, NamedTuple,
+                    Sequence, TypeVar, cast, overload)
 
 import rich.repr
-from rich.console import (
-    Console,
-    ConsoleOptions,
-    ConsoleRenderable,
-    JustifyMethod,
-    RenderableType,
-)
+from rich.console import (Console, ConsoleOptions, ConsoleRenderable,
+                          JustifyMethod, RenderableType)
 from rich.console import RenderResult as RichRenderResult
 from rich.measure import Measurement
 from rich.segment import Segment
@@ -48,7 +31,8 @@ if TYPE_CHECKING:
     from textual.app import RenderResult
 
 from textual import constants, errors, events, messages
-from textual._animator import DEFAULT_EASING, Animatable, BoundAnimator, EasingFunction
+from textual._animator import (DEFAULT_EASING, Animatable, BoundAnimator,
+                               EasingFunction)
 from textual._arrange import DockArrangeResult, arrange
 from textual._context import NoActiveAppError
 from textual._debug import get_caller_file_and_line
@@ -69,16 +53,8 @@ from textual.css.parse import parse_selectors
 from textual.css.query import NoMatches, WrongType
 from textual.css.scalar import Scalar, ScalarOffset
 from textual.dom import DOMNode, NoScreen
-from textual.geometry import (
-    NULL_REGION,
-    NULL_SIZE,
-    NULL_SPACING,
-    Offset,
-    Region,
-    Size,
-    Spacing,
-    clamp,
-)
+from textual.geometry import (NULL_REGION, NULL_SIZE, NULL_SPACING, Offset,
+                              Region, Size, Spacing, clamp)
 from textual.layout import Layout, WidgetPlacement
 from textual.layouts.vertical import VerticalLayout
 from textual.message import Message
@@ -97,15 +73,8 @@ if TYPE_CHECKING:
     from textual.css.query import QueryType
     from textual.filter import LineFilter
     from textual.message_pump import MessagePump
-    from textual.scrollbar import (
-        ScrollBar,
-        ScrollBarCorner,
-        ScrollDown,
-        ScrollLeft,
-        ScrollRight,
-        ScrollTo,
-        ScrollUp,
-    )
+    from textual.scrollbar import (ScrollBar, ScrollBarCorner, ScrollDown,
+                                   ScrollLeft, ScrollRight, ScrollTo, ScrollUp)
 
 _JUSTIFY_MAP: dict[str, JustifyMethod] = {
     "start": "left",
@@ -1024,13 +993,57 @@ class Widget(DOMNode):
 
     if TYPE_CHECKING:
 
-        @overload
-        def get_child_by_id(self, id: str) -> Widget: ...
+        def get_child_by_id(self, id: str) -> Widget:
+            """Return the first child (immediate descendent) of this node with the given ID.
 
-        @overload
+        Args:
+            id: The ID of the child.
+            expect_type: Require the object be of the supplied type, or None for any type.
+
+        Returns:
+            The first child of this node with the ID.
+
+        Raises:
+            NoMatches: if no children could be found for this ID
+            WrongType: if the wrong type was found.
+        """
+            child = self._get_dom_base()._nodes._get_by_id(id)
+            if child is None:
+                raise NoMatches(f"No child found with id={id!r}")
+            if expect_type is None:
+                return child
+            if not isinstance(child, expect_type):
+                raise WrongType(
+                    f"Child with id={id!r} is the wrong type; expected type {expect_type.__name__!r}, found {child}"
+                )
+            return child
+
         def get_child_by_id(
             self, id: str, expect_type: type[ExpectType]
-        ) -> ExpectType: ...
+        ) -> ExpectType:
+            """Return the first child (immediate descendent) of this node with the given ID.
+
+        Args:
+            id: The ID of the child.
+            expect_type: Require the object be of the supplied type, or None for any type.
+
+        Returns:
+            The first child of this node with the ID.
+
+        Raises:
+            NoMatches: if no children could be found for this ID
+            WrongType: if the wrong type was found.
+        """
+            child = self._get_dom_base()._nodes._get_by_id(id)
+            if child is None:
+                raise NoMatches(f"No child found with id={id!r}")
+            if expect_type is None:
+                return child
+            if not isinstance(child, expect_type):
+                raise WrongType(
+                    f"Child with id={id!r} is the wrong type; expected type {expect_type.__name__!r}, found {child}"
+                )
+            return child
 
     def get_child_by_id(
         self, id: str, expect_type: type[ExpectType] | None = None
@@ -1109,11 +1122,12 @@ class Widget(DOMNode):
         Returns:
             The first immediate child widget with the expected type.
         """
+        # Optimization: Avoid building the error string inside the loop; error is only raised after.
         for child in self._nodes:
-            # We want the child with the exact type (not subclasses)
             if type(child) is expect_type:
                 assert isinstance(child, expect_type)
                 return child
+        # Short path for the error raised if not found
         raise NoMatches(f"No immediate child of type {expect_type}; {self._nodes}")
 
     def get_component_rich_style(self, *names: str, partial: bool = False) -> Style:

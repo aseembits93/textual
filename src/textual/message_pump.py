@@ -16,17 +16,8 @@ from asyncio import CancelledError, QueueEmpty, Task, create_task
 from contextlib import contextmanager
 from functools import partial
 from time import perf_counter
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Awaitable,
-    Callable,
-    Generator,
-    Iterable,
-    Type,
-    TypeVar,
-    cast,
-)
+from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Generator,
+                    Iterable, Type, TypeVar, cast)
 from weakref import WeakSet
 
 from textual import Logger, events, log, messages

@@ -651,8 +651,10 @@ class TabbedContent(Widget):
         event.stop()
         tab_id = event.tab.id or ""
         try:
+            # Optimization: Only call get_child_by_type once per handler execution.
+            content_switcher = self.get_child_by_type(ContentSwitcher)
             with self.prevent(TabPane.Enabled):
-                self.get_child_by_type(ContentSwitcher).get_child_by_id(
+                content_switcher.get_child_by_id(
                     ContentTab.sans_prefix(tab_id), expect_type=TabPane
                 ).disabled = False
         except NoMatches:
