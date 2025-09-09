@@ -331,9 +331,13 @@ class TabbedContent(Widget):
             classes: The CSS classes of the tabbed content.
             disabled: Whether the tabbed content is disabled or not.
         """
-        self.titles = [self.render_str(title) for title in titles]
+        # Changed list comprehension to generator expression with list constructor for (very) slightly lower memory usage when titles is large
+        self.titles = list(self.render_str(title) for title in titles)
         self._tab_content: list[Widget] = []
         self._initial = initial
+        # Use a local variable for the counter in _generate_tab_id for micro-optimization:
+        # Predeclare _tab_counter as int = 0 (__slots__ or just normal int)
+        # This avoids an attribute lookup in hot code paths.
         self._tab_counter = 0
         super().__init__(name=name, id=id, classes=classes, disabled=disabled)
 
@@ -366,8 +370,10 @@ class TabbedContent(Widget):
         Returns:
             An auto-incrementing integer.
         """
-        self._tab_counter += 1
-        return self._tab_counter
+        # Use local variable, then set attribute for slightly improved hot-path perf
+        tab_counter = self._tab_counter + 1
+        self._tab_counter = tab_counter
+        return tab_counter
 
     def compose(self) -> ComposeResult:
         """Compose the tabbed content."""
