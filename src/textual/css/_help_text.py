@@ -20,6 +20,10 @@ from textual.css.constants import (
     VALID_TEXT_ALIGN,
 )
 from textual.css.scalar import SYMBOL_UNIT
+"""The type of styling the user was using when the error was encountered.
+Used to give help text specific to the context i.e. we give CSS help if the
+user hit an issue with their CSS, and Python help text when the user has an
+issue with inline styles."""
 
 StylingContext = Literal["inline", "css"]
 """The type of styling the user was using when the error was encountered.
@@ -89,7 +93,11 @@ def _contextualize_property_name(
     Returns:
         The property name converted to the given context.
     """
-    return _css_name(property_name) if context == "css" else _python_name(property_name)
+    # Inline the logic to avoid function call overhead for this extremely simple mapping
+    if context == "css":
+        return property_name.replace("_", "-")
+    else:
+        return property_name.replace("-", "_")
 
 
 def _spacing_examples(property_name: str) -> ContextSpecificBullets:
@@ -325,11 +333,36 @@ def color_property_help_text(
         summary = f"Invalid value for the [i]{property_name}[/] property"
     else:
         summary = f"Invalid value ({value!r}) for the [i]{property_name}[/] property"
-    suggested_color = (
-        error.suggested_color if error and isinstance(error, ColorParseError) else None
-    )
+
+    suggested_color = getattr(error, 'suggested_color', None) if error and isinstance(error, ColorParseError) else None
     if suggested_color:
         summary += f". Did you mean '{suggested_color}'?"
+
+    # Avoid recomputing the list and directly pass it to the bullets
+    if context == "inline":
+        context_bullets = [
+            Bullet(
+                "Assign colors using strings or Color objects",
+                examples=[
+                    Example(f'widget.styles.{property_name} = "#ff00aa"'),
+                    Example(f'widget.styles.{property_name} = "rgb(12,231,45)"'),
+                    Example(f'widget.styles.{property_name} = "red"'),
+                    Example(f"widget.styles.{property_name} = Color(1, 5, 29, a=0.5)"),
+                ],
+            )
+        ]
+    else:
+        context_bullets = [
+            Bullet(
+                "Colors can be set as follows",
+                examples=[
+                    Example(f"{property_name}: [#ff00aa]#ff00aa[/];"),
+                    Example(f"{property_name}: rgb(12,231,45);"),
+                    Example(f"{property_name}: [rgb(255,0,0)]red[/];"),
+                ],
+            )
+        ]
+
     return HelpText(
         summary=summary,
         bullets=[
@@ -337,33 +370,7 @@ def color_property_help_text(
                 f"The [i]{property_name}[/] property can only be set to a valid color"
             ),
             Bullet("Colors can be specified using hex, RGB, or ANSI color names"),
-            *ContextSpecificBullets(
-                inline=[
-                    Bullet(
-                        "Assign colors using strings or Color objects",
-                        examples=[
-                            Example(f'widget.styles.{property_name} = "#ff00aa"'),
-                            Example(
-                                f'widget.styles.{property_name} = "rgb(12,231,45)"'
-                            ),
-                            Example(f'widget.styles.{property_name} = "red"'),
-                            Example(
-                                f"widget.styles.{property_name} = Color(1, 5, 29, a=0.5)"
-                            ),
-                        ],
-                    )
-                ],
-                css=[
-                    Bullet(
-                        "Colors can be set as follows",
-                        examples=[
-                            Example(f"{property_name}: [#ff00aa]#ff00aa[/];"),
-                            Example(f"{property_name}: rgb(12,231,45);"),
-                            Example(f"{property_name}: [rgb(255,0,0)]red[/];"),
-                        ],
-                    )
-                ],
-            ).get_by_context(context),
+            *context_bullets,
         ],
     )
 
