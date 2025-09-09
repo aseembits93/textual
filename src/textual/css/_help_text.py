@@ -20,6 +20,10 @@ from textual.css.constants import (
     VALID_TEXT_ALIGN,
 )
 from textual.css.scalar import SYMBOL_UNIT
+"""The type of styling the user was using when the error was encountered.
+Used to give help text specific to the context i.e. we give CSS help if the
+user hit an issue with their CSS, and Python help text when the user has an
+issue with inline styles."""
 
 StylingContext = Literal["inline", "css"]
 """The type of styling the user was using when the error was encountered.
@@ -89,7 +93,11 @@ def _contextualize_property_name(
     Returns:
         The property name converted to the given context.
     """
-    return _css_name(property_name) if context == "css" else _python_name(property_name)
+    # Micro-opt: lift local lookup and avoid one layer of Python calls
+    if context == "css":
+        return property_name.replace("_", "-")
+    else:
+        return property_name.replace("-", "_")
 
 
 def _spacing_examples(property_name: str) -> ContextSpecificBullets:
@@ -459,27 +467,27 @@ def dock_property_help_text(property_name: str, context: StylingContext) -> Help
         Renderable for displaying the help text for this property.
     """
     property_name = _contextualize_property_name(property_name, context)
+    inline_bullet = Bullet(
+        "The 'dock' rule attaches a widget to the edge of a container.",
+        examples=[Example('header.styles.dock = "top"')],
+    )
+    css_bullet = Bullet(
+        "The 'dock' rule attaches a widget to the edge of a container.",
+        examples=[Example("dock: top")],
+    )
+    # Precompute both and only instantiate ContextSpecificBullets once
+    # Also, avoid unpacking for single-element list: just append
+    bullets = [
+        Bullet(
+            "The value must be one of 'top', 'right', 'bottom', 'left' or 'none'"
+        )
+    ]
+    bullets.extend(
+        [inline_bullet] if context == "inline" else [css_bullet]
+    )
     return HelpText(
         summary=f"Invalid value for [i]{property_name}[/] property",
-        bullets=[
-            Bullet(
-                "The value must be one of 'top', 'right', 'bottom', 'left' or 'none'"
-            ),
-            *ContextSpecificBullets(
-                inline=[
-                    Bullet(
-                        "The 'dock' rule attaches a widget to the edge of a container.",
-                        examples=[Example('header.styles.dock = "top"')],
-                    )
-                ],
-                css=[
-                    Bullet(
-                        "The 'dock' rule attaches a widget to the edge of a container.",
-                        examples=[Example("dock: top")],
-                    )
-                ],
-            ).get_by_context(context),
-        ],
+        bullets=bullets,
     )
 
 
