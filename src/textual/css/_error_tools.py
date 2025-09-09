@@ -18,13 +18,20 @@ def friendly_list(
     Returns:
         List as prose.
     """
-    words = [
-        repr(word) for word in sorted(words, key=str.lower) if word or not omit_empty
-    ]
-    if len(words) == 1:
-        return words[0]
-    elif len(words) == 2:
-        word1, word2 = words
-        return f"{word1} {joiner} {word2}"
-    else:
-        return f'{", ".join(words[:-1])}, {joiner} {words[-1]}'
+    # Materialize and filter once, to avoid extra sorting/comprehension steps
+    filtered = []
+    add_word = filtered.append
+    for word in words:
+        if word or not omit_empty:
+            add_word(word)
+    if not filtered:
+        return ""
+    # If only one or two items, avoid the sort/repr round-trip
+    if len(filtered) == 1:
+        return repr(filtered[0])
+    elif len(filtered) == 2:
+        return f"{repr(filtered[0])} {joiner} {repr(filtered[1])}"
+    # Sort only as needed for more than 2 items
+    filtered.sort(key=str.lower)
+    words_repr = [repr(word) for word in filtered]
+    return f'{", ".join(words_repr[:-1])}, {joiner} {words_repr[-1]}'
