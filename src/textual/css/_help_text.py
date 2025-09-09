@@ -20,6 +20,7 @@ from textual.css.constants import (
     VALID_TEXT_ALIGN,
 )
 from textual.css.scalar import SYMBOL_UNIT
+from functools import lru_cache
 
 StylingContext = Literal["inline", "css"]
 """The type of styling the user was using when the error was encountered.
@@ -438,11 +439,13 @@ def layout_property_help_text(property_name: str, context: StylingContext) -> He
         Renderable for displaying the help text for this property.
     """
     property_name = _contextualize_property_name(property_name, context)
+    # Cache the result for identical VALID_LAYOUT (its id as key)
+    valid_layout_str = _cached_friendly_list(id(VALID_LAYOUT))
     return HelpText(
         summary=f"Invalid value for [i]{property_name}[/] property",
         bullets=[
             Bullet(
-                f"The [i]{property_name}[/] property expects a value of {friendly_list(VALID_LAYOUT)}"
+                f"The [i]{property_name}[/] property expects a value of {valid_layout_str}"
             ),
         ],
     )
@@ -856,3 +859,8 @@ def table_rows_or_columns_help_text(
     return HelpText(
         summary=f"Invalid value '{value}' in [i]{property_name}[/] property"
     )
+
+@lru_cache(maxsize=8)
+def _cached_friendly_list(valid_layout_id: int) -> str:
+    # lru_cache is used to memoize friendly_list for the id of VALID_LAYOUT
+    return friendly_list(VALID_LAYOUT)
