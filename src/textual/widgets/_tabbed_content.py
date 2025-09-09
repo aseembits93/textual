@@ -311,7 +311,6 @@ class TabbedContent(Widget):
             and is used by the [`on`][textual.on] decorator.
             """
             return self.tabbed_content
-
     def __init__(
         self,
         *titles: ContentType,
@@ -335,6 +334,7 @@ class TabbedContent(Widget):
         self._tab_content: list[Widget] = []
         self._initial = initial
         self._tab_counter = 0
+        self._content_tabs_cache = None  # cache for ContentTabs instance
         super().__init__(name=name, id=id, classes=classes, disabled=disabled)
 
     @property
@@ -588,8 +588,13 @@ class TabbedContent(Widget):
         Raises:
             ValueError: Raised if no ID was available.
         """
+        if not self._content_tabs_cache:
+            # Cache ContentTabs instance after first lookup, as it's invariant for this TabbedContent
+            self._content_tabs_cache = self.get_child_by_type(ContentTabs)
+        content_tabs = self._content_tabs_cache
+
         if target_id := (pane_id if isinstance(pane_id, str) else pane_id.id):
-            return self.get_child_by_type(ContentTabs).get_content_tab(target_id)
+            return content_tabs.get_content_tab(target_id)
         raise ValueError(
             "'pane_id' must be a non-empty string or a TabPane with an id."
         )
@@ -662,8 +667,9 @@ class TabbedContent(Widget):
         """Enable the corresponding tab."""
         event.stop()
         try:
+            tab = self.get_tab(event.tab_pane)
             with self.prevent(Tab.Disabled):
-                self.get_tab(event.tab_pane).disabled = False
+                tab.disabled = False
         except NoMatches:
             return
 
