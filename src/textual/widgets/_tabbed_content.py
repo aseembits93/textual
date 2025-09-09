@@ -331,7 +331,8 @@ class TabbedContent(Widget):
             classes: The CSS classes of the tabbed content.
             disabled: Whether the tabbed content is disabled or not.
         """
-        self.titles = [self.render_str(title) for title in titles]
+        render_str = self.render_str
+        self.titles = [render_str(title) for title in titles]
         self._tab_content: list[Widget] = []
         self._initial = initial
         self._tab_counter = 0
@@ -357,7 +358,7 @@ class TabbedContent(Widget):
             The same TabPane.
         """
         if content.id is None:
-            content.id = f"tab-{new_id}"
+            content.id = "tab-" + str(new_id)
         return content
 
     def _generate_tab_id(self) -> int:
