@@ -20,6 +20,30 @@ from textual.css.constants import (
     VALID_TEXT_ALIGN,
 )
 from textual.css.scalar import SYMBOL_UNIT
+"""The type of styling the user was using when the error was encountered.
+Used to give help text specific to the context i.e. we give CSS help if the
+user hit an issue with their CSS, and Python help text when the user has an
+issue with inline styles."""
+
+_SPLIT_MESSAGE = "The 'split' splits the container and aligns the widget to the given edge."
+
+_SPLIT_EXAMPLE_INLINE = Example('header.styles.split = "top"')
+
+_SPLIT_EXAMPLE_CSS = Example("split: top")
+
+_SPLIT_BULLET_INLINE = Bullet(
+    _SPLIT_MESSAGE,
+    examples=[_SPLIT_EXAMPLE_INLINE],
+)
+
+_SPLIT_BULLET_CSS = Bullet(
+    _SPLIT_MESSAGE,
+    examples=[_SPLIT_EXAMPLE_CSS],
+)
+
+_SPLIT_CONTEXT_BULLETS_INLINE = [_SPLIT_BULLET_INLINE]
+
+_SPLIT_CONTEXT_BULLETS_CSS = [_SPLIT_BULLET_CSS]
 
 StylingContext = Literal["inline", "css"]
 """The type of styling the user was using when the error was encountered.
@@ -89,7 +113,11 @@ def _contextualize_property_name(
     Returns:
         The property name converted to the given context.
     """
-    return _css_name(property_name) if context == "css" else _python_name(property_name)
+    # Manually inline and branch for slightly faster execution than calling a function
+    if context == "css":
+        return property_name.replace("_", "-")
+    else:
+        return property_name.replace("-", "_")
 
 
 def _spacing_examples(property_name: str) -> ContextSpecificBullets:
@@ -493,26 +521,17 @@ def split_property_help_text(property_name: str, context: StylingContext) -> Hel
     Returns:
         Renderable for displaying the help text for this property.
     """
+    # Local variable for fast lookup
     property_name = _contextualize_property_name(property_name, context)
+    bullet = Bullet("The value must be one of 'top', 'right', 'bottom' or 'left'")
+    # Branch to avoid instantiating fresh ContextSpecificBullets (and dataclasses machinery) each call
+    if context == "inline":
+        context_bullets = _SPLIT_CONTEXT_BULLETS_INLINE
+    else:
+        context_bullets = _SPLIT_CONTEXT_BULLETS_CSS
     return HelpText(
         summary=f"Invalid value for [i]{property_name}[/] property",
-        bullets=[
-            Bullet("The value must be one of 'top', 'right', 'bottom' or 'left'"),
-            *ContextSpecificBullets(
-                inline=[
-                    Bullet(
-                        "The 'split' splits the container and aligns the widget to the given edge.",
-                        examples=[Example('header.styles.split = "top"')],
-                    )
-                ],
-                css=[
-                    Bullet(
-                        "The 'split' splits the container and aligns the widget to the given edge.",
-                        examples=[Example("split: top")],
-                    )
-                ],
-            ).get_by_context(context),
-        ],
+        bullets=[bullet, *context_bullets],
     )
 
 
