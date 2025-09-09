@@ -20,6 +20,14 @@ from textual.css.constants import (
     VALID_TEXT_ALIGN,
 )
 from textual.css.scalar import SYMBOL_UNIT
+"""The type of styling the user was using when the error was encountered.
+Used to give help text specific to the context i.e. we give CSS help if the
+user hit an issue with their CSS, and Python help text when the user has an
+issue with inline styles."""
+"""The type of styling the user was using when the error was encountered.
+Used to give help text specific to the context i.e. we give CSS help if the
+user hit an issue with their CSS, and Python help text when the user has an
+issue with inline styles."""
 
 StylingContext = Literal["inline", "css"]
 """The type of styling the user was using when the error was encountered.
@@ -72,7 +80,10 @@ def _css_name(property_name: str) -> str:
     Returns:
         The CSS property name
     """
-    return property_name.replace("_", "-")
+    # Using str.translate for better performance on large numbers of replacements
+    if '_' not in property_name:
+        return property_name
+    return property_name.translate({95: 45})  # ord('_')=95, ord('-')=45
 
 
 def _contextualize_property_name(
@@ -89,7 +100,15 @@ def _contextualize_property_name(
     Returns:
         The property name converted to the given context.
     """
-    return _css_name(property_name) if context == "css" else _python_name(property_name)
+    # Direct inline logic avoids extra function call frames for micro-improvement
+    if context == "css":
+        if '_' not in property_name:
+            return property_name
+        return property_name.replace("_", "-")
+    else:
+        if '-' not in property_name:
+            return property_name
+        return property_name.replace("-", "_")
 
 
 def _spacing_examples(property_name: str) -> ContextSpecificBullets:
