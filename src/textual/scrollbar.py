@@ -304,10 +304,13 @@ class ScrollBar(Widget):
         Returns:
             Scrollbar renderable.
         """
+        window_virtual_size = self.window_virtual_size
+        window_size = self.window_size
+        
         window_size = (
-            self.window_size if self.window_size < self.window_virtual_size else 0
+            window_size if window_size < window_virtual_size else 0
         )
-        virtual_size = self.window_virtual_size
+        virtual_size = window_virtual_size
 
         return self.renderer(
             virtual_size=ceil(virtual_size),
