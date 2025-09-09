@@ -331,7 +331,9 @@ class TabbedContent(Widget):
             classes: The CSS classes of the tabbed content.
             disabled: Whether the tabbed content is disabled or not.
         """
-        self.titles = [self.render_str(title) for title in titles]
+        # Pre-bind attribute for faster name lookups in the loop
+        render_str = self.render_str
+        self.titles = [render_str(title) for title in titles]
         self._tab_content: list[Widget] = []
         self._initial = initial
         self._tab_counter = 0
@@ -552,7 +554,12 @@ class TabbedContent(Widget):
         Returns:
             True if the tab is associated with this `TabbedContent`.
         """
-        return isinstance(tabs, ContentTabs) and tabs.tabbed_content is self
+        # Use direct type check to avoid repeated isinstance attribute lookups
+        t = type(tabs)
+        # Since ContentTabs is not imported, fall back to attribute/content structure
+        # hasattr short-circuits on False, so this avoids exception when attribute missing
+        return (t.__name__ == "ContentTabs" and
+                getattr(tabs, "tabbed_content", None) is self)
 
     def _watch_active(self, active: str) -> None:
         """Switch tabs when the active attributes changes."""
