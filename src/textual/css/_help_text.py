@@ -20,6 +20,10 @@ from textual.css.constants import (
     VALID_TEXT_ALIGN,
 )
 from textual.css.scalar import SYMBOL_UNIT
+"""The type of styling the user was using when the error was encountered.
+Used to give help text specific to the context i.e. we give CSS help if the
+user hit an issue with their CSS, and Python help text when the user has an
+issue with inline styles."""
 
 StylingContext = Literal["inline", "css"]
 """The type of styling the user was using when the error was encountered.
@@ -89,7 +93,11 @@ def _contextualize_property_name(
     Returns:
         The property name converted to the given context.
     """
-    return _css_name(property_name) if context == "css" else _python_name(property_name)
+    # Inlining function bodies for performance (saves Python call stack overhead)
+    if context == "css":
+        return property_name.replace("_", "-")
+    else:
+        return property_name.replace("-", "_")
 
 
 def _spacing_examples(property_name: str) -> ContextSpecificBullets:
@@ -529,30 +537,28 @@ def fractional_property_help_text(
         Renderable for displaying the help text for this property.
     """
     property_name = _contextualize_property_name(property_name, context)
+
+    # Prepare example values up front to avoid repeated f-string computation
+    if context == "inline":
+        # Precompute all property_name strings used below only once
+        example1 = Example(f'widget.styles.{property_name} = "50%"')
+        example2 = Example(f"widget.styles.{property_name} = 0.25")
+        bullet = Bullet(
+            f"Set [i]{property_name}[/] to a string or float value",
+            examples=[example1, example2],
+        )
+    else:
+        example1 = Example(f"{property_name}: 50%;")
+        example2 = Example(f"{property_name}: 0.25;")
+        bullet = Bullet(
+            f"Set [i]{property_name}[/] to a string or float",
+            examples=[example1, example2],
+        )
+
+    # Directly construct the bullets list for the requested context to avoid creating 2 sequences
     return HelpText(
         summary=f"Invalid value for [i]{property_name}[/] property",
-        bullets=[
-            *ContextSpecificBullets(
-                inline=[
-                    Bullet(
-                        f"Set [i]{property_name}[/] to a string or float value",
-                        examples=[
-                            Example(f'widget.styles.{property_name} = "50%"'),
-                            Example(f"widget.styles.{property_name} = 0.25"),
-                        ],
-                    )
-                ],
-                css=[
-                    Bullet(
-                        f"Set [i]{property_name}[/] to a string or float",
-                        examples=[
-                            Example(f"{property_name}: 50%;"),
-                            Example(f"{property_name}: 0.25;"),
-                        ],
-                    )
-                ],
-            ).get_by_context(context)
-        ],
+        bullets=[bullet],
     )
 
 
