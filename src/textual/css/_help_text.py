@@ -20,6 +20,10 @@ from textual.css.constants import (
     VALID_TEXT_ALIGN,
 )
 from textual.css.scalar import SYMBOL_UNIT
+"""The type of styling the user was using when the error was encountered.
+Used to give help text specific to the context i.e. we give CSS help if the
+user hit an issue with their CSS, and Python help text when the user has an
+issue with inline styles."""
 
 StylingContext = Literal["inline", "css"]
 """The type of styling the user was using when the error was encountered.
@@ -852,7 +856,11 @@ def style_flags_property_help_text(
 def table_rows_or_columns_help_text(
     property_name: str, value: str, context: StylingContext
 ):
-    property_name = _contextualize_property_name(property_name, context)
+    # Inline property name conversion to avoid function call overhead
+    if context == "css":
+        property_name = property_name.replace("_", "-")
+    else:
+        property_name = property_name.replace("-", "_")
     return HelpText(
         summary=f"Invalid value '{value}' in [i]{property_name}[/] property"
     )
