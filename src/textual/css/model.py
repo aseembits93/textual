@@ -250,11 +250,17 @@ class RuleSet:
 
     @classmethod
     def _selector_to_css(cls, selectors: list[Selector]) -> str:
+        # Local reference for quicker lookup
+        DESCENDENT = CombinatorType.DESCENDENT
+        CHILD = CombinatorType.CHILD
         tokens: list[str] = []
+
+        # Pre-calculate combinator string only when needed for speed
         for selector in selectors:
-            if selector.combinator == CombinatorType.DESCENDENT:
+            combinator = selector.combinator
+            if combinator is DESCENDENT:
                 tokens.append(" ")
-            elif selector.combinator == CombinatorType.CHILD:
+            elif combinator is CHILD:
                 tokens.append(" > ")
             tokens.append(selector.css)
 
