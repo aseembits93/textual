@@ -328,13 +328,14 @@ class Document(DocumentBase):
         else:
             start_line = lines[top_row]
             end_line = lines[bottom_row] if bottom_row <= self.line_count - 1 else ""
-            selected_text = start_line[top_column:]
+            parts = [start_line[top_column:]]
             for row in range(top_row + 1, bottom_row):
-                selected_text += self._newline + lines[row]
+                parts.append(lines[row])
 
             if bottom_row < self.line_count:
-                selected_text += self._newline
-                selected_text += end_line[:bottom_column]
+                parts.append(end_line[:bottom_column])
+
+            selected_text = self._newline.join(parts)
 
         return selected_text
 
