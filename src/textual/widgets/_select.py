@@ -130,25 +130,28 @@ class SelectOverlay(OptionList):
         Returns:
             The index of the option that matches the query, or `None` if no match is found.
         """
+        # Convert query once
+        query_lower = query.lower()
         best_match: int | None = None
         minimum_index: int | None = None
 
-        query = query.lower()
-        for index, option in enumerate(self._options):
-            prompt = option.prompt
-            if isinstance(prompt, Text):
+        # Localize for speed
+        options = self._options
+        for idx in range(len(options)):
+            prompt = options[idx].prompt
+            # Avoid isinstance call when possible
+            if type(prompt) is Text:
                 lower_prompt = prompt.plain.lower()
-            elif isinstance(prompt, str):
+            elif type(prompt) is str:
                 lower_prompt = prompt.lower()
             else:
                 continue
 
-            match_index = lower_prompt.find(query)
-            if match_index != -1 and (
-                minimum_index is None or match_index < minimum_index
-            ):
-                best_match = index
-                minimum_index = match_index
+            match_index = lower_prompt.find(query_lower)
+            if match_index != -1:
+                if minimum_index is None or match_index < minimum_index:
+                    best_match = idx
+                    minimum_index = match_index
 
         return best_match
 
