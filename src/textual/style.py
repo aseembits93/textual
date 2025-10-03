@@ -244,6 +244,12 @@ class Style:
             New style.
         """
         from textual.markup import parse_style
+        """
+The Style class contains all the information needed to generate styled terminal output.
+
+You won't often need to create Style objects directly, if you are using [Content][textual.content.Content] for output.
+But you might want to use styles for more customized widgets.
+"""
 
         try:
             app = active_app.get()

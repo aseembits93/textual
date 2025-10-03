@@ -9,6 +9,7 @@ from operator import itemgetter
 
 from textual.css.parse import substitute_references
 from textual.css.tokenizer import UnexpectedEnd
+from functools import lru_cache
 
 __all__ = ["MarkupError", "escape", "to_content"]
 
@@ -351,15 +352,14 @@ def _to_content(
     spans: list[Span] = []
 
     position = 0
-    tag_text: list[str]
 
-    normalize_markup_tag = Style._normalize_markup_tag
+    normalize_markup_tag = _memo_normalize_markup_tag  # Use memoized version
 
     if template_variables is None:
-        process_text = lambda text: text
-
+        # Direct lookup, faster than lambda
+        def process_text(text: str) -> str:
+            return text
     else:
-
         def process_text(template_text: str, /) -> str:
             if "$" in template_text:
                 return Template(template_text).safe_substitute(template_variables)
@@ -373,8 +373,7 @@ def _to_content(
             position += len(value)
 
         elif token_name == "open_tag":
-            tag_text = []
-
+            tag_text: list[str] = []
             eof = False
             contains_text = False
             for token in iter_tokens:
@@ -385,36 +384,38 @@ def _to_content(
                 elif token.name == "eof":
                     eof = True
                 tag_text.append(token.value)
+            tag_joined = "".join(tag_text)
+            tag_stripped = tag_joined.strip()
+
             if contains_text or eof:
-                # "tag" was unparsable
-                text_content = f"[{''.join(tag_text)}" + ("" if eof else "]")
+                text_content = f"[{tag_joined}" + ("" if eof else "]")
                 text_append(text_content)
                 position += len(text_content)
             else:
-                opening_tag = "".join(tag_text)
-
-                if not opening_tag.strip():
-                    blank_tag = f"[{opening_tag}]"
+                if not tag_stripped:
+                    blank_tag = f"[{tag_joined}]"
                     text_append(blank_tag)
                     position += len(blank_tag)
                 else:
                     style_stack.append(
                         (
                             position,
-                            opening_tag,
-                            normalize_markup_tag(opening_tag.strip()),
+                            tag_joined,
+                            normalize_markup_tag(tag_stripped),
                         )
                     )
 
         elif token_name == "open_closing_tag":
-            tag_text = []
+            tag_text: list[str] = []
             for token in iter_tokens:
                 if token.name == "end_tag":
                     break
                 tag_text.append(token.value)
-            closing_tag = "".join(tag_text).strip()
-            normalized_closing_tag = normalize_markup_tag(closing_tag)
+            closing_tag = "".join(tag_text)
+            closing_tag_stripped = closing_tag.strip()
+            normalized_closing_tag = normalize_markup_tag(closing_tag_stripped)
             if normalized_closing_tag:
+                # style_stack search is unchanged (correct order)
                 for index, (tag_position, tag_body, normalized_tag_body) in enumerate(
                     reversed(style_stack), 1
                 ):
@@ -425,7 +426,7 @@ def _to_content(
                         break
                 else:
                     raise MarkupError(
-                        f"closing tag '[/{closing_tag}]' does not match any open tag"
+                        f"closing tag '[/{closing_tag_stripped}]' does not match any open tag"
                     )
 
             else:
@@ -454,6 +455,12 @@ def _to_content(
     )
 
     return content
+
+
+# Helper for normalization with memoization at module level to maximize cache hits
+@lru_cache(maxsize=4096)
+def _memo_normalize_markup_tag(text_style: str) -> str:
+    return Style._normalize_markup_tag(text_style)
 
 
 if __name__ == "__main__":  # pragma: no cover
