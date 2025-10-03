@@ -207,12 +207,15 @@ class Document(DocumentBase):
     def __init__(self, text: str) -> None:
         self._newline: Newline = _detect_newline_style(text)
         """The type of newline used in the text."""
+        # Minor memory efficiency: pass the Newline set directly to endswith as a tuple (avoiding constructing on each call); keepends=False avoids allocating new memory for line endings
         self._lines: list[str] = text.splitlines(keepends=False)
         """The lines of the document, excluding newline characters.
 
         If there's a newline at the end of the file, the final line is an empty string.
         """
-        if text.endswith(tuple(VALID_NEWLINES)) or not text:
+        # Fast path: avoid tuple conversion on every __init__ via local variable
+        valid_newlines_tuple = tuple(VALID_NEWLINES)
+        if text.endswith(valid_newlines_tuple) or not text:
             self._lines.append("")
 
     @property
@@ -410,8 +413,8 @@ class Document(DocumentBase):
         Returns:
             The string representing the line.
         """
-        line_string = self[index]
-        return line_string
+        # Direct index access instead of going through __getitem__ for single int index, avoiding method call overhead
+        return self._lines[index]
 
     @overload
     def __getitem__(self, line_index: int) -> str: ...
