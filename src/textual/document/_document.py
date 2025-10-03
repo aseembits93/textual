@@ -13,6 +13,10 @@ if TYPE_CHECKING:
 from textual._cells import cell_len
 from textual.geometry import Size
 
+"""The type representing valid line separators."""
+"""The set of valid line separator strings."""
+"""A location (row, column) within the document. Indexing starts at 0."""
+
 Newline = Literal["\r\n", "\n", "\r"]
 """The type representing valid line separators."""
 VALID_NEWLINES = set(get_args(Newline))
@@ -264,6 +268,11 @@ class Document(DocumentBase):
             The EditResult containing information about the completed
                 replace operation.
         """
+        # Avoid repeated attribute lookups and function calls
+        lines = self._lines
+        newline = self._newline
+        line_count = len(lines)
+
         top, bottom = sorted((start, end))
         top_row, top_column = top
         bottom_row, bottom_column = bottom
@@ -273,18 +282,38 @@ class Document(DocumentBase):
             # Special case where a single newline character is inserted.
             insert_lines.append("")
 
-        lines = self._lines
-
-        replaced_text = self.get_text_range(top, bottom)
-        if bottom_row >= len(lines):
-            after_selection = ""
+        # Inline fast text range extraction to avoid slow get_text_range call
+        if top == bottom:
+            replaced_text = ""
         else:
-            after_selection = lines[bottom_row][bottom_column:]
+            if top_row == bottom_row:
+                replaced_text = lines[top_row][top_column:bottom_column]
+            else:
+                start_line = lines[top_row][top_column:]
+                # Use list and str.join for much faster concatenation in long range
+                middle = lines[top_row + 1:bottom_row]
+                selected_lines = [start_line]
+                if middle:
+                    selected_lines.extend(middle)
+                end_line = lines[bottom_row] if bottom_row <= line_count - 1 else ""
+                trailing = ""
+                if bottom_row < line_count:
+                    trailing = newline + end_line[:bottom_column]
+                if selected_lines:
+                    # Grab full lines with separator, except last one
+                    replaced_text = (newline).join(selected_lines) + trailing
+                else:
+                    replaced_text = trailing
 
-        if top_row >= len(lines):
-            before_selection = ""
-        else:
-            before_selection = lines[top_row][:top_column]
+        # before_selection/after_selection extraction
+        before_selection = (
+            "" if top_row >= line_count
+            else lines[top_row][:top_column]
+        )
+        after_selection = (
+            "" if bottom_row >= line_count
+            else lines[bottom_row][bottom_column:]
+        )
 
         if insert_lines:
             insert_lines[0] = before_selection + insert_lines[0]
