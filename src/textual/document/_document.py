@@ -13,6 +13,10 @@ if TYPE_CHECKING:
 from textual._cells import cell_len
 from textual.geometry import Size
 
+"""The type representing valid line separators."""
+"""The set of valid line separator strings."""
+"""A location (row, column) within the document. Indexing starts at 0."""
+
 Newline = Literal["\r\n", "\n", "\r"]
 """The type representing valid line separators."""
 VALID_NEWLINES = set(get_args(Newline))
@@ -381,17 +385,21 @@ class Document(DocumentBase):
         Raises:
             ValueError: If the index is doesn't correspond to a location in the document.
         """
-        error_message = (
-            f"Index {index!r} does not correspond to a location in the document."
-        )
+        # Only format message if actually raising, not always
         if index < 0 or index > len(self.text):
+            error_message = (
+                f"Index {index!r} does not correspond to a location in the document."
+            )
             raise ValueError(error_message)
 
         column_index = 0
-        newline_length = len(self.newline)
+        newline_length = len(self._newline)
+        lines = self._lines  # Local variable for faster repeated access
+
+        # Directly access self._lines instead of calling self.get_line
         for line_index in range(self.line_count):
             next_column_index = (
-                column_index + len(self.get_line(line_index)) + newline_length
+                column_index + len(lines[line_index]) + newline_length
             )
             if index < next_column_index:
                 return (line_index, index - column_index)
@@ -399,6 +407,9 @@ class Document(DocumentBase):
                 return (line_index + 1, 0)
             column_index = next_column_index
 
+        error_message = (
+            f"Index {index!r} does not correspond to a location in the document."
+        )
         raise ValueError(error_message)
 
     def get_line(self, index: int) -> str:
