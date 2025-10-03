@@ -24,25 +24,21 @@ def get_tab_widths(line: str, tab_size: int = 4) -> list[tuple[str, int]]:
             and the widths of the tabs after tab expansion is applied.
     """
 
+    # Split once on all tabs for much faster processing than regex matching
+    tab_count = line.count('\t')
     parts: list[tuple[str, int]] = []
-    add_part = parts.append
     cell_position = 0
-    matches = _TABS_SPLITTER_RE.findall(line)
 
-    for match in matches:
+    segments = line.split('\t')
+    # Each tab except the last requires expansion
+    for i, segment in enumerate(segments):
         expansion_width = 0
-        if match.endswith("\t"):
-            # Remove the tab, and check the width of the rest of the line.
-            match = match[:-1]
-            cell_position += cell_len(match)
-
-            # Now move along the line by the width of the tab.
+        if i < tab_count:
+            cell_position += cell_len(segment)
             tab_remainder = cell_position % tab_size
             expansion_width = tab_size - tab_remainder
             cell_position += expansion_width
-
-        add_part((match, expansion_width))
-
+        parts.append((segment, expansion_width))
     return parts
 
 
