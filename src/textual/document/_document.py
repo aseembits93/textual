@@ -41,7 +41,7 @@ def _utf8_encode(text: str) -> bytes:
     Returns:
         The utf-8 bytes representing the input string.
     """
-    return text.encode("utf-8")
+    return text.encode()
 
 
 def _detect_newline_style(text: str) -> Newline:
