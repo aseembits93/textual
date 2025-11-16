@@ -196,12 +196,19 @@ class BindingsMap:
             instance, or a tuple of 3 values mapping to the first three
             properties of a `Binding`.
         """
-
         self.key_to_bindings: dict[str, list[Binding]] = {}
         """Mapping of key (e.g. "ctrl+a") to list of bindings for that key."""
 
-        for binding in Binding.make_bindings(bindings or {}):
-            self.key_to_bindings.setdefault(binding.key, []).append(binding)
+        if bindings:
+            # Optimize by converting the iterable to a list once if not already a list
+            bindings_list = bindings if isinstance(bindings, list) else list(bindings)
+            for binding in Binding.make_bindings(bindings_list):
+                # Direct access and append instead of setdefault for performance
+                bucket = self.key_to_bindings.get(binding.key)
+                if bucket is not None:
+                    bucket.append(binding)
+                else:
+                    self.key_to_bindings[binding.key] = [binding]
 
     def _add_binding(self, binding: Binding) -> None:
         """Add a new binding.
@@ -231,6 +238,7 @@ class BindingsMap:
         Returns:
             New `BindingsMap`
         """
+        # Direct assignment is fastest
         bindings = cls()
         bindings.key_to_bindings = keys
         return bindings
