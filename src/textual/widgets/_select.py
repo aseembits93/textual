@@ -432,7 +432,8 @@ class Select(Generic[SelectType], Vertical, can_focus=True):
         self._type_to_search = type_to_search
         if tooltip is not None:
             self.tooltip = tooltip
-        self.compact = compact
+        if compact:
+            self.compact = True
 
     @classmethod
     def from_values(
@@ -473,8 +474,9 @@ class Select(Generic[SelectType], Vertical, can_focus=True):
         Returns:
             A new Select widget with the provided values as options.
         """
-        options_iterator = [(str(value), value) for value in values]
-
+        # Use a generator expression for options to reduce memory usage,
+        # especially for large/many values.
+        options_iterator = ((str(v), v) for v in values)
         return cls(
             options_iterator,
             prompt=prompt,
