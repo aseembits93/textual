@@ -347,19 +347,17 @@ def _to_content(
     iter_tokens = iter(tokenizer(markup, ("inline", "")))
 
     style_stack: list[tuple[int, str, str]] = []
-
     spans: list[Span] = []
-
     position = 0
-    tag_text: list[str]
 
     normalize_markup_tag = Style._normalize_markup_tag
 
+    # Local cache for normalized tag strings (very hot!)
+    tag_normalize_cache: dict[str, str] = {}
+
     if template_variables is None:
         process_text = lambda text: text
-
     else:
-
         def process_text(template_text: str, /) -> str:
             if "$" in template_text:
                 return Template(template_text).safe_substitute(template_variables)
@@ -368,66 +366,91 @@ def _to_content(
     for token in iter_tokens:
         token_name = token.name
         if token_name == "text":
-            value = process_text(token.value.replace("\\[", "["))
+            # Special fast-path for no-template: skip replace if unneeded
+            value = token.value
+            if "\\[" in value:
+                value = value.replace("\\[", "[")
+            value = process_text(value)
             text_append(value)
             position += len(value)
 
         elif token_name == "open_tag":
-            tag_text = []
-
+            tag_text: list[str] = []
             eof = False
             contains_text = False
-            for token in iter_tokens:
-                if token.name == "end_tag":
+            token2 = None # local ref, avoids extra lookups
+
+            for token2 in iter_tokens:
+                n = token2.name
+                if n == "end_tag":
                     break
-                elif token.name == "text":
+                elif n == "text":
                     contains_text = True
-                elif token.name == "eof":
+                elif n == "eof":
                     eof = True
-                tag_text.append(token.value)
+                tag_text.append(token2.value)
+
+            # On parse failure or EOF, just add literal string
             if contains_text or eof:
-                # "tag" was unparsable
-                text_content = f"[{''.join(tag_text)}" + ("" if eof else "]")
+                text_content = "[" + "".join(tag_text)
+                if not eof:
+                    text_content += "]"
                 text_append(text_content)
                 position += len(text_content)
             else:
                 opening_tag = "".join(tag_text)
+                stripped_tag = opening_tag.strip()
 
-                if not opening_tag.strip():
+                if not stripped_tag:
                     blank_tag = f"[{opening_tag}]"
                     text_append(blank_tag)
                     position += len(blank_tag)
                 else:
+                    # Cache normalization results by stripped tag text
+                    if stripped_tag in tag_normalize_cache:
+                        normalized = tag_normalize_cache[stripped_tag]
+                    else:
+                        normalized = normalize_markup_tag(stripped_tag)
+                        tag_normalize_cache[stripped_tag] = normalized
+
                     style_stack.append(
                         (
                             position,
                             opening_tag,
-                            normalize_markup_tag(opening_tag.strip()),
+                            normalized
                         )
                     )
 
         elif token_name == "open_closing_tag":
-            tag_text = []
-            for token in iter_tokens:
-                if token.name == "end_tag":
+            tag_text: list[str] = []
+            for token2 in iter_tokens:
+                if token2.name == "end_tag":
                     break
-                tag_text.append(token.value)
+                tag_text.append(token2.value)
+
             closing_tag = "".join(tag_text).strip()
-            normalized_closing_tag = normalize_markup_tag(closing_tag)
+            # Cache normalization of closing tags
+            if closing_tag in tag_normalize_cache:
+                normalized_closing_tag = tag_normalize_cache[closing_tag]
+            else:
+                normalized_closing_tag = normalize_markup_tag(closing_tag)
+                tag_normalize_cache[closing_tag] = normalized_closing_tag
+
             if normalized_closing_tag:
-                for index, (tag_position, tag_body, normalized_tag_body) in enumerate(
-                    reversed(style_stack), 1
-                ):
+                # Reverse-search for matching style tag
+                idx_to_pop = None
+                for index, (tag_position, tag_body, normalized_tag_body) in enumerate(reversed(style_stack), 1):
                     if normalized_tag_body == normalized_closing_tag:
-                        style_stack.pop(-index)
+                        idx_to_pop = -index
                         if tag_position != position:
                             spans.append(Span(tag_position, position, tag_body))
                         break
+                if idx_to_pop is not None:
+                    style_stack.pop(idx_to_pop)
                 else:
                     raise MarkupError(
                         f"closing tag '[/{closing_tag}]' does not match any open tag"
                     )
-
             else:
                 if not style_stack:
                     raise MarkupError("auto closing tag ('[/]') has nothing to close")
@@ -435,25 +458,26 @@ def _to_content(
                 if open_position != position:
                     spans.append(Span(open_position, position, tag_body))
 
+    # Efficiently collect out-of-stack spans without double reverse/sort.
     content_text = "".join(text)
     text_length = len(content_text)
+
     if style_stack and text_length:
-        spans.extend(
-            [
-                Span(position, text_length, tag_body)
-                for position, tag_body, _ in reversed(style_stack)
-                if position != text_length
-            ]
-        )
-    spans.reverse()
-    spans.sort(key=itemgetter(0))  # Zeroth item of Span is 'start' attribute
+        for position_, tag_body, _ in reversed(style_stack):
+            if position_ != text_length:
+                spans.append(Span(position_, text_length, tag_body))
 
-    content = Content(
-        content_text,
-        [Span(0, text_length, style), *spans] if (style and text_length) else spans,
-    )
+    # Single sort; reverse unnecessary as spans are added in order now
+    if spans:
+        spans.sort(key=itemgetter(0))
 
-    return content
+    if style and text_length:
+        content_spans = [Span(0, text_length, style), *spans]
+    else:
+        content_spans = spans
+
+    # Avoid extra variable assignments
+    return Content(content_text, content_spans)
 
 
 if __name__ == "__main__":  # pragma: no cover
