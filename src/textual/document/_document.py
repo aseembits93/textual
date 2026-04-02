@@ -13,6 +13,10 @@ if TYPE_CHECKING:
 from textual._cells import cell_len
 from textual.geometry import Size
 
+"""The type representing valid line separators."""
+"""The set of valid line separator strings."""
+"""A location (row, column) within the document. Indexing starts at 0."""
+
 Newline = Literal["\r\n", "\n", "\r"]
 """The type representing valid line separators."""
 VALID_NEWLINES = set(get_args(Newline))
@@ -364,9 +368,13 @@ class Document(DocumentBase):
             The index in the document's text.
         """
         row, column = location
-        index = row * len(self.newline) + column
+        # Use local reference for improved attribute access performance
+        newline_len = len(self.newline)
+        index = row * newline_len + column
+        # Avoid repeated attribute lookups in loop, and reduce function calls
+        lines = self._lines
         for line_index in range(row):
-            index += len(self.get_line(line_index))
+            index += len(lines[line_index])
         return index
 
     def get_location_from_index(self, index: int) -> Location:
